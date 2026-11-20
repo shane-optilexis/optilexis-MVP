@@ -9,8 +9,8 @@ from optilexis_api.main import create_app
 from optilexis_api.settings import Settings
 
 TOKENS = {
-    "local-test-alice-access-token-00000001": {"sub": "alice", "scope": "journeys:read journeys:write translation:demo"},
-    "local-test-bob-access-token-0000000002": {"sub": "bob", "scope": "journeys:read journeys:write translation:demo"},
+    "local-test-alice-access-token-00000001": {"sub": "alice", "scope": "journeys:read journeys:write translation:demo translation:live"},
+    "local-test-bob-access-token-0000000002": {"sub": "bob", "scope": "journeys:read journeys:write translation:demo translation:live"},
     "local-test-readonly-access-token-0003": {"sub": "readonly", "scope": "journeys:read"},
 }
 

@@ -19,6 +19,7 @@ from .models import (Journey, StartJourney, RouteEvent, EventOutcome,
 from .repository import JourneyRepository
 from .predictor import assess_event
 from .translation import CuratedPhraseProvider
+from .live_text import LiveTextRequest, LiveTextResponse, AzureTextTranslator, LiveTextUnavailable
 from .settings import Settings
 
 
@@ -36,7 +37,8 @@ class ServiceStatus(BaseModel):
     environment: str
 
 
-def create_app(settings_override: Settings | None = None) -> FastAPI:
+def create_app(settings_override: Settings | None = None,
+               text_translator_override: AzureTextTranslator | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         settings = settings_override or Settings.from_env()
@@ -65,6 +67,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             "navigation": "maps_handoff_only; here_sdk_not_integrated",
             "simulation": "development_only" if request.app.state.settings.env == "development" else "disabled",
             "speech_translation": "not_integrated",
+            "text_translation": ("azure_configured_unverified" if request.app.state.settings.text_translator == "azure" else "disabled"),
             "phrasebook": "curated_demo",
             "meta_wearables": "not_integrated",
             "vantrue_live_video": "unverified_no_integration",
@@ -144,6 +147,37 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     def demo_phrase(payload: PhraseRequest,
                     principal: Principal = Depends(require_scope("translation:demo"))) -> PhraseResponse:
         return CuratedPhraseProvider().lookup(payload)
+
+    @api.post("/v1/translation/text", response_model=LiveTextResponse)
+    async def translate_text(payload: LiveTextRequest, request: Request,
+                             principal: Principal = Depends(require_scope("translation:live")),
+                             db: Session = Depends(get_db)) -> LiveTextResponse:
+        if not payload.user_activated:
+            raise HTTPException(status_code=403, detail="Explicit user action is required")
+        journey = owner_repo(db, principal).get(payload.journey_id)
+        if journey is None:
+            raise HTTPException(status_code=404, detail="Journey not found")
+        if journey.closed_at is not None:
+            raise HTTPException(status_code=409, detail="Journey already closed")
+        if journey.mode.value == "drive":
+            raise HTTPException(status_code=409, detail="Typing while driving is disabled")
+        if len(payload.text.encode("utf-8")) > 1000:
+            raise HTTPException(status_code=413, detail="Input too long")
+        settings = request.app.state.settings
+        if settings.text_translator != "azure":
+            raise HTTPException(status_code=503, detail="Text translation is not configured")
+        provider = text_translator_override or AzureTextTranslator(
+            endpoint=settings.azure_translator_endpoint,
+            key=settings.azure_translator_key,
+            region=settings.azure_translator_region,
+        )
+        try:
+            result = await provider.translate(payload.text, payload.source_language, payload.target_language)
+        except LiveTextUnavailable:
+            raise HTTPException(status_code=503, detail="Translation temporarily unavailable") from None
+        return LiveTextResponse(translated_text=result,
+                                source_language=payload.source_language,
+                                target_language=payload.target_language)
 
     @api.post("/v1/translation/freeform", status_code=501)
     def unconfigured_translation(principal: Principal = Depends(require_scope("translation:demo"))) -> dict:
