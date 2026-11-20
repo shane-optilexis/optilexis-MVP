@@ -79,7 +79,7 @@ class OptilexisApi {
     if (_tokenProvider is! OidcAccessTokenProvider) {
       throw const OptilexisApiException('OIDC provider registration is required');
     }
-    await (_tokenProvider as OidcAccessTokenProvider).session.signIn();
+    await _tokenProvider.session.signIn();
   }
 
   Future<bool> restoreOidc() async =>
@@ -87,7 +87,7 @@ class OptilexisApi {
 
   Future<void> signOut() async {
     if (_tokenProvider is OidcAccessTokenProvider) {
-      await (_tokenProvider as OidcAccessTokenProvider).session.signOut();
+      await _tokenProvider.session.signOut();
     } else {
       clearDebugToken();
     }

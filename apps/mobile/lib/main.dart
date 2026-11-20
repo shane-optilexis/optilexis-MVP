@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -202,7 +201,7 @@ class _JourneyHomeState extends State<JourneyHome> {
         );
         if (mounted) {
           setState(() => _lastPosition =
-              pos.latitude.toStringAsFixed(4) + ', ' + pos.longitude.toStringAsFixed(4));
+              '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}');
         }
       });
 
@@ -634,7 +633,7 @@ class _JourneyHomeState extends State<JourneyHome> {
               ),
               ElevatedButton(
                 onPressed: _busy ? null : _translateLiveText,
-                child: Text('Translate to ' + (_languages[_language] ?? 'selected language')),
+                child: Text('Translate to ${_languages[_language]}'),
               ),
               if (_liveTranslatedText != null) ...[
                 const SizedBox(height: 10),
@@ -657,7 +656,7 @@ class _JourneyHomeState extends State<JourneyHome> {
               icon: const Icon(Icons.my_location_outlined),
               label: const Text('Check my phone position'),
             ),
-            if (_lastPosition != null) Text('Approximate coordinates: ' + _lastPosition!),
+            if (_lastPosition != null) Text('Approximate coordinates: $_lastPosition'),
           ]),
         ),
       );

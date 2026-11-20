@@ -64,8 +64,8 @@ class OidcSession {
         additionalParameters: config.additionalParameters,
       ),
     );
-    if (response?.accessToken == null) throw StateError('Identity provider returned no API access token');
-    await _save(response!.accessToken!, response.refreshToken,
+    if (response.accessToken == null) throw StateError('Identity provider returned no API access token');
+    await _save(response.accessToken!, response.refreshToken,
         response.accessTokenExpirationDateTime);
   }
 
@@ -91,8 +91,8 @@ class OidcSession {
         refreshToken: refreshToken,
         scopes: config.requestedScopes,
       ));
-      if (response?.accessToken == null) throw StateError('Access token refresh failed');
-      await _save(response!.accessToken!, response.refreshToken ?? refreshToken,
+      if (response.accessToken == null) throw StateError('Access token refresh failed');
+      await _save(response.accessToken!, response.refreshToken ?? refreshToken,
           response.accessTokenExpirationDateTime);
       return response.accessToken;
     } catch (_) {
@@ -113,3 +113,4 @@ class OidcSession {
       await _storage.delete(key: key);
     }
   }
+}
