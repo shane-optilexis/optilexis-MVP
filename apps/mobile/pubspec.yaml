@@ -3,12 +3,15 @@ description: Optilexis walking-first multilingual mobility development prototype
 publish_to: none
 version: 0.1.0+1
 environment:
-  sdk: '>=3.6.0 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 dependencies:
   flutter:
     sdk: flutter
   url_launcher: ^6.3.3
   material_ui: ^1.11.1
+  flutter_appauth: ^12.1.0
+  flutter_secure_storage: ^11.0.0
+  geolocator: ^14.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

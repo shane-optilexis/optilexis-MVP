@@ -4,12 +4,20 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'models.dart';
+import 'oidc_auth.dart';
 
 /// Implement this with OIDC Authorization Code + PKCE and secure token storage
 /// when an actual identity provider is provisioned. No production OIDC client
 /// credentials or tokens are embedded in this app.
 abstract class AccessTokenProvider {
   Future<String?> accessToken();
+}
+
+class OidcAccessTokenProvider implements AccessTokenProvider {
+  OidcAccessTokenProvider(this.session);
+  final OidcSession session;
+  @override
+  Future<String?> accessToken() => session.accessToken();
 }
 
 class UnconfiguredAccessTokenProvider implements AccessTokenProvider {
@@ -42,13 +50,17 @@ class OptilexisApi {
   OptilexisApi({String? baseUrl, AccessTokenProvider? tokenProvider})
       : _baseUrl = baseUrl ?? const String.fromEnvironment(
             'OPTILEXIS_API_URL', defaultValue: 'http://10.0.2.2:8000'),
-        _tokenProvider = tokenProvider ?? DebugAccessTokenProvider();
+        _tokenProvider = tokenProvider ??
+            (OidcConfiguration.fromEnvironment().isConfigured
+                ? OidcAccessTokenProvider(OidcSession(OidcConfiguration.fromEnvironment()))
+                : DebugAccessTokenProvider());
 
   final String _baseUrl;
   final AccessTokenProvider _tokenProvider;
   final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
 
   String get baseUrl => _baseUrl;
+  bool get oidcConfigured => _tokenProvider is OidcAccessTokenProvider;
   bool get canEnterDebugToken => kDebugMode && _tokenProvider is DebugAccessTokenProvider;
   bool get debugTokenConfigured => _tokenProvider is DebugAccessTokenProvider &&
       _tokenProvider.configured;
@@ -60,6 +72,24 @@ class OptilexisApi {
   void clearDebugToken() {
     if (_tokenProvider is DebugAccessTokenProvider) {
       _tokenProvider.clear();
+    }
+  }
+
+  Future<void> signInOidc() async {
+    if (_tokenProvider is! OidcAccessTokenProvider) {
+      throw const OptilexisApiException('OIDC provider registration is required');
+    }
+    await (_tokenProvider as OidcAccessTokenProvider).session.signIn();
+  }
+
+  Future<bool> restoreOidc() async =>
+      oidcConfigured && (await _tokenProvider.accessToken()) != null;
+
+  Future<void> signOut() async {
+    if (_tokenProvider is OidcAccessTokenProvider) {
+      await (_tokenProvider as OidcAccessTokenProvider).session.signOut();
+    } else {
+      clearDebugToken();
     }
   }
 
@@ -111,6 +141,19 @@ class OptilexisApi {
         'phrase_key': phraseKey,
         'language': language,
       }));
+
+  Future<Map<String, dynamic>> translateText({
+    required String journeyId,
+    required String text,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) => _object('POST', '/v1/translation/text', body: {
+        'journey_id': journeyId,
+        'text': text,
+        'source_language': sourceLanguage,
+        'target_language': targetLanguage,
+        'user_activated': true,
+      });
 
   Future<JourneyDto> closeJourney(String id) async =>
       JourneyDto.fromJson(await _object('POST', '/v1/journeys/${Uri.encodeComponent(id)}/close', body: {}));
