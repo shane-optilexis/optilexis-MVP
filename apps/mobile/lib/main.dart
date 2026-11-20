@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'src/api_client.dart';
@@ -374,7 +374,7 @@ class _JourneyHomeState extends State<JourneyHome> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _language,
+              initialValue: _language,
               decoration: const InputDecoration(labelText: 'Language for assistance'),
               items: _languages.entries
                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
@@ -392,7 +392,7 @@ class _JourneyHomeState extends State<JourneyHome> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _navigation,
+              initialValue: _navigation,
               decoration: const InputDecoration(labelText: 'Navigation mode'),
               items: const [
                 DropdownMenuItem(value: 'maps_handoff', child: Text('External Maps handoff')),

@@ -51,15 +51,15 @@ class OptilexisApi {
   String get baseUrl => _baseUrl;
   bool get canEnterDebugToken => kDebugMode && _tokenProvider is DebugAccessTokenProvider;
   bool get debugTokenConfigured => _tokenProvider is DebugAccessTokenProvider &&
-      (_tokenProvider as DebugAccessTokenProvider).configured;
+      _tokenProvider.configured;
 
   void setDebugToken(String token) {
     if (!canEnterDebugToken) throw const OptilexisApiException('Development sign-in unavailable');
-    (_tokenProvider as DebugAccessTokenProvider).setToken(token);
+    _tokenProvider.setToken(token);
   }
   void clearDebugToken() {
     if (_tokenProvider is DebugAccessTokenProvider) {
-      (_tokenProvider as DebugAccessTokenProvider).clear();
+      _tokenProvider.clear();
     }
   }
 

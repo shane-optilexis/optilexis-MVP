@@ -27,7 +27,7 @@ Visit `http://127.0.0.1:8000/docs`. Keep `.env.local` private and do not expose 
 
 ## Run Flutter locally
 
-Requires Flutter 3.27+ (Dart >= 3.6) and an Android emulator or iOS simulator with native tooling.
+Requires Flutter 3.50+ (Dart >= 3.6) and an Android emulator or iOS simulator with native tooling.
 
 ```bash
 ./scripts/bootstrap_flutter.sh  # generates missing Android/iOS project runners

@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/apps/mobile"
 if ! command -v flutter >/dev/null; then
-  echo 'Install Flutter 3.27+ (Dart >= 3.6) first: https://docs.flutter.dev/get-started/install' >&2
+  echo 'Install Flutter 3.50+ (Dart >= 3.6) first: https://docs.flutter.dev/get-started/install' >&2
   exit 1
 fi
 # Generates missing platform runners; existing lib/ and test/ content are retained.

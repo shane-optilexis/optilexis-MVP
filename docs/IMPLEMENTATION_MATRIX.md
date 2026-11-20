@@ -15,7 +15,7 @@
 | Navigation interface | `navigation.py`, `navigation_contract.dart` | Simulation labeled, permission denial & HERE boundary; licensed HERE SDK unavailable |
 | Maps handoff | `main.dart::_handoff` | Source provided, no app-to-app route telemetry; mobile device test pending |
 | Translation provider | `translation.py`, `speech_contract.dart` | Provider contract, consent/cost/timeout gate + demo phrasebook; no live ASR/MT/TTS |
-| Flutter typed API | `api_client.dart`, `models.dart` | Code implemented, history and debug sign-in wired; `flutter analyze/test` CI pending |
+| Flutter typed API (`material_ui` 1.x) | `api_client.dart`, `models.dart` | Code implemented, history and debug sign-in wired; `flutter analyze/test` CI pending |
 | Seven-language phrasebook | `phrases.py` | Previously verified; limited curated demonstration translations |
 | Vantrue E1 Pro S | Architecture only | Official camera video interface unverified; no actual integration |
 | Meta glasses | Architecture only | Native device access/bridge not built |
