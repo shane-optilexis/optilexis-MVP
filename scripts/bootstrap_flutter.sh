@@ -15,6 +15,8 @@ cat > android/app/src/debug/AndroidManifest.xml <<'XML'
   <application android:usesCleartextTraffic="true" />
 </manifest>
 XML
+# Generate native login callback and permission settings.
+python3 "$ROOT/scripts/configure_native.py"
 # iOS ATS local debug rule may require developer-specific Xcode simulator configuration.
 flutter pub get
 flutter analyze
