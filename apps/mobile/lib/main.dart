@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'src/api_client.dart';
 import 'src/design.dart';
+import 'src/models.dart';
 
 void main() => runApp(const OptilexisApp());
 
@@ -53,6 +55,7 @@ class JourneyHome extends StatefulWidget {
 
 class _JourneyHomeState extends State<JourneyHome> {
   final _destination = TextEditingController(text: 'Shinjuku Station, Tokyo');
+  final _debugToken = TextEditingController();
   late final OptilexisApi _api;
   late final bool _ownsApi;
 
@@ -65,21 +68,30 @@ class _JourneyHomeState extends State<JourneyHome> {
   bool _busy = false;
   bool _backendOnline = false;
   String? _error;
-  Map<String, dynamic>? _journey;
-  Map<String, dynamic>? _lastOutcome;
-  Map<String, dynamic>? _lastPhrase;
+  JourneyDto? _journey;
+  EventOutcomeDto? _lastOutcome;
+  PhraseDto? _lastPhrase;
+  List<JourneyDto> _history = [];
+  bool _authenticated = false;
 
   @override
   void initState() {
     super.initState();
     _ownsApi = widget.api == null;
     _api = widget.api ?? OptilexisApi();
+    final configured = _api.debugTokenConfigured;
     _pingBackend();
+    if (configured) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadHistory();
+      });
+    }
   }
 
   @override
   void dispose() {
     _destination.dispose();
+    _debugToken.dispose();
     if (_ownsApi) _api.dispose();
     super.dispose();
   }
@@ -114,6 +126,34 @@ class _JourneyHomeState extends State<JourneyHome> {
     }
   }
 
+  Future<void> _loadHistory() => _run(() async {
+        final history = await _api.listJourneys();
+        if (!mounted) return;
+        setState(() {
+          _history = history;
+          _authenticated = true;
+          if (_journey == null) {
+            for (final trip in history) {
+              if (trip.active) {
+                _journey = trip;
+                _language = trip.language;
+                _mode = trip.mode;
+                _navigation = trip.navigationMode;
+                _consentLocation = trip.consent.location;
+                _consentMicrophone = trip.consent.microphone;
+                break;
+              }
+            }
+          }
+        });
+      });
+
+  Future<void> _signIn() async {
+    _api.setDebugToken(_debugToken.text);
+    await _loadHistory();
+    _debugToken.clear();
+  }
+
   Future<void> _start() => _run(() async {
         if (_destination.text.trim().length < 2) {
           throw const OptilexisApiException('Enter a destination first');
@@ -128,6 +168,7 @@ class _JourneyHomeState extends State<JourneyHome> {
         );
         setState(() {
           _journey = created;
+          _history = [created, ..._history];
           _lastOutcome = null;
           _lastPhrase = null;
           _parked = false;
@@ -136,7 +177,7 @@ class _JourneyHomeState extends State<JourneyHome> {
 
   Future<void> _event(String event) => _run(() async {
         final outcome = await _api.sendSimulationEvent(
-          journeyId: _journey!['id'] as String,
+          journeyId: _journey!.id,
           event: event,
           parked: _parked,
         );
@@ -152,8 +193,9 @@ class _JourneyHomeState extends State<JourneyHome> {
       });
 
   Future<void> _end() => _run(() async {
-        await _api.closeJourney(_journey!['id'] as String);
+        final closed = await _api.closeJourney(_journey!.id);
         setState(() {
+          _history = _history.map((item) => item.id == closed.id ? closed : item).toList();
           _journey = null;
           _lastOutcome = null;
           _lastPhrase = null;
@@ -161,7 +203,7 @@ class _JourneyHomeState extends State<JourneyHome> {
       });
 
   Future<void> _handoff() async {
-    final destination = _journey?['destination'] as String?;
+    final destination = _journey?.destination;
     if (destination == null) return;
     final uri = Uri.https('www.google.com', '/maps/dir/', {
       'api': '1',
@@ -188,6 +230,20 @@ class _JourneyHomeState extends State<JourneyHome> {
             ],
           ),
           actions: [
+            if (_authenticated && kDebugMode) IconButton(
+              tooltip: 'Sign out of development account',
+              onPressed: _busy ? null : () {
+                _api.clearDebugToken();
+                setState(() {
+                  _authenticated = false;
+                  _journey = null;
+                  _history = [];
+                  _lastOutcome = null;
+                  _lastPhrase = null;
+                });
+              },
+              icon: const Icon(Icons.logout_outlined),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Icon(
@@ -205,9 +261,14 @@ class _JourneyHomeState extends State<JourneyHome> {
                 padding: const EdgeInsets.all(18),
                 children: [
                   _prototypeBanner(),
+                  if (kDebugMode && !_authenticated) _developmentSignInCard(),
+                  if (!kDebugMode && !_authenticated) _notice('OIDC sign-in integration is pending provider registration. Release mode has no development token fallback.', Colors.orangeAccent),
                   if (_error != null) _notice(_error!, Colors.orangeAccent),
-                  if (_journey == null) _setupCard() else _activeJourneyCard(),
-                  if (_journey != null) ...[
+                  if (_authenticated) ...[
+                    if (_journey == null) _setupCard() else _activeJourneyCard(),
+                    _historyCard(),
+                  ],
+                  if (_authenticated && _journey != null) ...[
                     const SizedBox(height: 10),
                     _simulationCard(),
                     if (_lastOutcome != null) _outcomeCard(),
@@ -218,7 +279,7 @@ class _JourneyHomeState extends State<JourneyHome> {
                   _devicesCard(),
                   const SizedBox(height: 16),
                   const Text(
-                    'Development build • No live GPS, ASR, TTS, HERE navigation, Meta or Vantrue connection.',
+                    'Pilot foundation • No live GPS, ASR, TTS, HERE navigation, Meta or Vantrue connection.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: optilexisMuted, fontSize: 12),
                   ),
@@ -226,6 +287,50 @@ class _JourneyHomeState extends State<JourneyHome> {
               ),
             ),
           ),
+        ),
+      );
+
+  Widget _developmentSignInCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _section('Development sign in'),
+            const Text('Enter the local pilot token configured on your development server. Tokens are held in memory only; production OIDC login is not yet enabled.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _debugToken,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(labelText: 'Development bearer token'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: _busy ? null : _signIn, child: const Text('Verify development identity')),
+          ]),
+        ),
+      );
+
+  Widget _historyCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _section('My journeys (persisted)'),
+            OutlinedButton(onPressed: _busy ? null : _loadHistory, child: const Text('Refresh my journeys')),
+            if (_history.isEmpty) const Text('No journeys saved for this identity'),
+            ..._history.take(8).map((trip) => ListTile(
+              title: Text(trip.destination),
+              subtitle: Text(trip.active ? 'Active • ${trip.stage}' : 'Closed • ${trip.stage}'),
+              trailing: trip.active ? const Icon(Icons.play_circle_outline) : const Icon(Icons.check_circle_outline),
+              onTap: trip.active && !_busy ? () => setState(() {
+                _journey = trip;
+                _language = trip.language;
+                _mode = trip.mode;
+                _navigation = trip.navigationMode;
+                _lastOutcome = null;
+                _lastPhrase = null;
+              }) : null,
+            )),
+          ]),
         ),
       );
 
@@ -322,7 +427,7 @@ class _JourneyHomeState extends State<JourneyHome> {
           padding: const EdgeInsets.all(18),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             _section('Journey active'),
-            Text(_journey!['destination'] as String,
+            Text(_journey!.destination,
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 7),
             Text('Mode: $_mode • Language: ${_languages[_language]}',
@@ -367,21 +472,21 @@ class _JourneyHomeState extends State<JourneyHome> {
       );
 
   Widget _outcomeCard() {
-    final suggestion = _lastOutcome!['suggestion'];
-    final suppressed = _lastOutcome!['suppressed'] == true;
+    final suggestion = _lastOutcome!.suggestion;
+    final suppressed = _lastOutcome!.suppressed;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _section(suppressed ? 'Prompt suppressed' : 'Predictive recommendation'),
           if (suppressed)
-            Text('${_lastOutcome!['reason']}', style: const TextStyle(color: Colors.orangeAccent))
-          else if (suggestion is Map<String, dynamic>) ...[
-            Text('${suggestion['title']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text('${_lastOutcome!.reason}', style: const TextStyle(color: Colors.orangeAccent))
+          else if (suggestion != null) ...[
+            Text(suggestion.title, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text('${suggestion['message']}'),
+            Text(suggestion.message),
             const SizedBox(height: 8),
-            Text('Next action: ${suggestion['action']}',
+            Text('Next action: ${suggestion.action}',
                 style: const TextStyle(color: optilexisTeal)),
           ],
           const SizedBox(height: 10),
@@ -412,9 +517,9 @@ class _JourneyHomeState extends State<JourneyHome> {
           padding: const EdgeInsets.all(18),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _section('Translated demo phrase'),
-            Text('${_lastPhrase!['source_text']}', style: const TextStyle(color: optilexisMuted)),
+            Text(_lastPhrase!.sourceText, style: const TextStyle(color: optilexisMuted)),
             const SizedBox(height: 12),
-            SelectableText('${_lastPhrase!['translated_text']}',
+            SelectableText(_lastPhrase!.translatedText,
                 style: const TextStyle(fontSize: 20, color: optilexisTeal)),
             const SizedBox(height: 8),
             const Text('Curated demonstration, not real-time translation or audio.',

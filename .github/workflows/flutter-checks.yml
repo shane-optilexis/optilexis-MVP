@@ -1,0 +1,15 @@
+name: Flutter checks
+on:
+  push:
+  pull_request:
+jobs:
+  flutter-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native project scaffold and check Dart code
+        run: ./scripts/bootstrap_flutter.sh

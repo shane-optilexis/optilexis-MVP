@@ -1,111 +1,77 @@
-# Optilexis — Mobile MVP / Codex Starter
+# OPTILEXIS — Mobile MVP
 
-> **One journey. Every language.**  
-> Development starter created from `docs/Optilexis_Mobile_App_Technical_Architecture_and_Development_Plan.docx`.
+> **One journey. Every language.**
 
-## What works in this first coding increment
+This repository contains a walking-first, cross-platform Flutter concept and an authenticated FastAPI journey service. **Sprint 02 introduces durable multi-user storage, token verification and typed integration contracts.** This is a pilot foundation, not a shipped mobile app or connected navigation service.
 
-- **Python/FastAPI journey API:** create, inspect, close and simulate journeys.
-- **Context-aware rules engine:** airport, station, hotel, parking and off-route recommendations.
-- **Driving safety policy:** suppresses nonessential contextual prompts while moving.
-- **Seven-language curated phrasebook:** English, Japanese, French, Spanish, German, Chinese and Thai.
-- **Flutter mobile UI source:** trip setup, language/mode selections, map handoff, manual scenario tests, results and device status.
-- **9 automated backend tests** passing in this build environment.
-- **Original Word specification** included in `docs/`.
+## Shipped source functionality
 
-## Not working yet (must not be represented as operational)
+- **FastAPI:** authenticated owner-scoped create/read/list/close/delete journeys, persistent consent update, removal of one's own data, capability disclosures.
+- **Database:** SQLAlchemy PostgreSQL-compatible model + Alembic revision; SQLite is used for local deterministic migration/testing. Identity, journey sessions, route-mode metadata, recommendation-event metadata and audit metadata are durable.
+- **Authentication:** configurable RS256 OIDC access-token validation with issuer, audience and scope checks. A separate local development-token path works only with `ENV=development` and explicit opt-in; **never** ship it to a public service.
+- **Journey intelligence:** rule-based simulated airport, station, hotel, parking, off-route event handling and driving distraction suppression. Events are visibly labeled simulated.
+- **Flutter:** typed API responses, create/list/inspect/close owner journeys, resume saved trips, Google Maps handoff, debug identity screen, multilingual curated phrasebook and navy/teal design.
+- **Provider boundaries:** interfaces for owned vs external navigation, HERE licensing and future ASR/translation/TTS; no provider has been falsely simulated as a live SDK.
 
-- No HERE Navigate SDK, real location tracking, licensed route calculation or live maneuver events.
-- No live ASR, machine translation, TTS, AI LLM or speech streaming. Curated phrases only.
-- No physical Meta glasses, Vantrue camera API, video processing or supported in-car UI.
-- No production accounts, authorization, durable persistence or privacy/regulatory approval.
-- There is no deployed backend, App Store binary, or hosted web app in this archive.
-- Flutter cannot be compiled in the authoring environment; use the instructions below to create native runners and validate it on your machine or Codex environment.
+## Run the backend locally
 
-## 1. Run the backend
+Requires Python 3.11+ and a local controlled environment.
 
-Requires Python 3.11+.
+```bash
+python3 -m pip install -r services/journey-api/requirements-dev.txt
+python3 scripts/create_dev_config.py  # generate .env.local and a random development token
+./scripts/run_api.sh                 # runs Alembic upgrade and localhost API
+```
+
+Visit `http://127.0.0.1:8000/docs`. Keep `.env.local` private and do not expose this debug backend to the public internet. The generated token should be entered in the **debug mobile sign-in screen**.
+
+## Run Flutter locally
+
+Requires Flutter 3.27+ (Dart >= 3.6) and an Android emulator or iOS simulator with native tooling.
+
+```bash
+./scripts/bootstrap_flutter.sh  # generates missing Android/iOS project runners
+cd apps/mobile
+flutter run --dart-define=OPTILEXIS_API_URL=http://10.0.2.2:8000
+# iOS simulator: instead use http://127.0.0.1:8000
+```
+
+The Flutter app does not include production OAuth login yet. You can authenticate against the development service by pasting the one-time generated **developer token** into the debug-only identity screen. The token is held in memory and not saved to local storage. `https://` is required for remote and non-debug app builds. A production OIDC Authorization Code + PKCE client is a separate integration to implement with the selected provider and secure native token storage.
+
+## Verify
 
 ```bash
 cd services/journey-api
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
 python -m pytest
-uvicorn optilexis_api.main:app --host 127.0.0.1 --port 8000 --reload
+# With Flutter toolchain available:
+cd ../../apps/mobile
+flutter analyze
+flutter test
 ```
 
-Open `http://127.0.0.1:8000/docs` for interactive API documentation.
+The CI workflows independently run backend tests and Flutter lint/widget tests. **Physical mobile builds, live PostgreSQL and real OIDC IdP integration have not been verified in the authoring environment.** Check GitHub Actions before marking the sprint production-ready.
 
-**Security:** This backend is a local, unauthenticated, single-user simulator. Do not bind it publicly or deploy to production. For physical devices, first add a properly authenticated and TLS-secured development environment.
+## Data security and isolation
 
-## 2. Run the Flutter app
+Every journey API operation enforces bearer auth, scope and server-resolved owner. User A cannot read, mutate, close or delete User B's journeys. Only simulation metadata is stored—no raw GPS traces, speech recordings, transcripts, video, or cloud AI prompts. Users can revoke consent and request owned journey or account-data deletion. Retention sweep implementation exists but requires an operator-approved scheduler to run it.
 
-Requires Flutter 3.27+ (Dart 3.6+) and Android Studio / Xcode. In a Flutter-enabled terminal:
+## Intentionally not connected
 
-```bash
-./scripts/bootstrap_flutter.sh
-cd apps/mobile
-flutter doctor
-flutter run --dart-define=OPTILEXIS_API_URL=http://10.0.2.2:8000
-```
+- No live GPS route tracking, HERE Navigate licensed SDK, external Maps turn events, Meta Wearables, Vantrue streaming, ASR/MT/TTS, CarPlay, Android Auto or LLM-based recommendations.
+- No real production identity provider registration, iOS/Android store release, hardened deployment, completed privacy review or active fleet integration.
+- The optional 4K camera is **not** a dependency of the phone-first MVP. The published Vantrue OSS disclosure is **not** proof of an authorized camera SDK.
 
-`10.0.2.2` is the Android emulator's alias for the development machine. On an iOS simulator, use `http://127.0.0.1:8000`. For a physical phone, follow security and networking prerequisites—do **not** expose the unauthenticated API to the public network.
-
-The bootstrap script generates missing native Android/iOS runner files using `flutter create`, adds Android **debug-only** cleartext HTTP allowance, obtains packages, analyzes Dart and runs Flutter tests. The non-generated source files already exist under `apps/mobile/lib`.
-
-Google Maps handoff opens an external directions link but does **not** provide route progress back to Optilexis. Choosing `own_route` shows that SDK integration remains pending.
-
-## 3. Example end-to-end API flow
-
-```bash
-# Start a trip.
-curl -s http://127.0.0.1:8000/v1/journeys \
-  -H 'Content-Type: application/json' \
-  -d '{"destination":"Shinjuku Station, Tokyo","language":"ja","mode":"walk"}'
-
-# Copy the returned id and simulate a route-context event.
-curl -s http://127.0.0.1:8000/v1/journeys/YOUR_JOURNEY_ID/events \
-  -H 'Content-Type: application/json' \
-  -d '{"event":"station_approach","source":"simulation"}'
-
-# Obtain a curated phrase (not a live translation).
-curl -s http://127.0.0.1:8000/v1/translation/demo-phrase \
-  -H 'Content-Type: application/json' \
-  -d '{"phrase_key":"station_platform","language":"ja"}'
-```
-
-## 4. Handoff to Codex
-
-1. Unzip the repository and open the folder as a Codex project or push it to a connected GitHub repository.
-2. Read `AGENTS.md`, `docs/IMPLEMENTATION_MATRIX.md`, and the original Word requirements.
-3. Start with `codex/SPRINT_02.md`; complete its acceptance tests before expanding scope.
-4. Commit each feature increment and keep unverified hardware integrations behind adapters.
-
-**Suggested first Codex instruction:**
-
-> Read `AGENTS.md` and the attached requirements in `docs/`. Run the FastAPI tests, then bootstrap and analyze the Flutter mobile app. Fix build issues without claiming unimplemented integrations. Implement Sprint 02 (authenticated, persistent journey storage and testable navigation provider interfaces). Include tests and a brief verification report.
-
-## Repository map
+## Repository layout
 
 ```text
-apps/mobile/               Flutter client source (requires flutter create runners)
-services/journey-api/      FastAPI backend, prediction rules and test suite
-codex/SPRINT_02.md         Next coding iteration and acceptance tests
-AGENTS.md                  Codex working rules and scope protections
-docs/IMPLEMENTATION_MATRIX.md
-  ↳ Feature implementation coverage, verified/pending status
-docs/Optilexis_Mobile_App_Technical_Architecture_and_Development_Plan.docx
-  ↳ Original product/architecture requirement
-.github/workflows/         Backend test automation
+apps/mobile/                 Flutter app, debug identity screen, typed APIs, provider contracts
+services/journey-api/       FastAPI app, SQLAlchemy + Alembic, scoped APIs, unit tests
+.github/workflows/          Backend and Flutter verification
+scripts/                    Flutter bootstrap, local dev token/config, API runner
+docs/AUTH_AND_MIGRATIONS.md Multiuser data/security and migration instructions
+docs/IMPLEMENTATION_MATRIX.md Feature coverage and open gaps
+codex/SPRINT_02.md          Original Sprint 02 acceptance checklist
+AGENTS.md                   Coding-agent rules and scope protection
 ```
 
-## External references
-
-- HERE Flutter Navigation: https://docs.here.com/here-sdk/docs/flutter-navigation
-- HERE Flutter SDK integration: https://docs.here.com/here-sdk/docs/flutter-integrate-here-sdk
-- Flutter url_launcher: https://pub.dev/packages/url_launcher
-- Vantrue E1 Pro S: https://www.vantrue.com/products/element-1-pro-s-4k-dashcam
-- Vantrue source disclosure: https://www.vantrue.com/pages/open-source-software
-
-No commercial integration rights are inferred from published product marketing or OSS disclosures.
+See the architecture/requirements in `docs/PRODUCT_REQUIREMENTS.md` and `docs/ARCHITECTURE.md` for original scope; `docs/Optilexis_Mobile_App_Technical_Architecture_and_Development_Plan.docx` is an associated planning document, not yet included as a binary in GitHub.

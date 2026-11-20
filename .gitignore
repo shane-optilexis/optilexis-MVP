@@ -19,3 +19,7 @@ apps/mobile/ios/Flutter/Generated.xcconfig
 apps/mobile/ios/Flutter/flutter_export_environment.sh
 apps/mobile/pubspec.lock
 *.log
+
+# Sprint 02 development state
+.env.local
+services/journey-api/var/
