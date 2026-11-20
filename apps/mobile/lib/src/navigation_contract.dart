@@ -45,9 +45,11 @@ class SimulatedRouteProvider implements NavigationProvider {
 }
 
 class HereNavigateAdapter implements NavigationProvider {
-  const HereNavigateAdapter();
+  const HereNavigateAdapter({this.enabled = false});
+  final bool enabled;
   @override
   Future<void> startRoute({required String journeyId, required bool osLocationPermissionGranted}) async {
+    if (!enabled) throw const NavigationUnavailable('HERE Navigate feature flag is disabled');
     if (!osLocationPermissionGranted) {
       throw const NavigationUnavailable('Location permission denied');
     }

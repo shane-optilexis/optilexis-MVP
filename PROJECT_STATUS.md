@@ -7,7 +7,7 @@ Implemented locally and proposed for `sprint-02-auth-persistence-contracts` pull
 - Owner-filtered journey CRUD, persisted consent/history, session/audit/route/recommendation metadata, deletion and retention function.
 - Typed navigation boundaries (simulation, HERE-unavailable, external Maps handoff), typed speech/translation boundary with microphone/consent and request budget checks.
 - Flutter typed journey DTOs, token-aware HTTP API, debug-only sign-in, persisted history and resume. No live device access.
-- GitHub Actions backend test workflow and Flutter analysis/test workflow.
+- GitHub Actions backend unit and real PostgreSQL integration test workflows, plus Flutter analysis/test workflow.
 
 Verification:
 

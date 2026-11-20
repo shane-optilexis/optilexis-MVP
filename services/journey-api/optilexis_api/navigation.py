@@ -56,8 +56,13 @@ class SimulatedNavigationProvider:
 
 
 class HereNavigateBoundary:
-    """Deliberate unavailable adapter until licensed native HERE SDK is integrated."""
+    """Explicit feature-flagged boundary until licensed native HERE SDK is integrated."""
+    def __init__(self, *, enabled: bool = False):
+        self.enabled = enabled
+
     async def start_route(self, journey_id: UUID, *, location_permission_granted: bool) -> None:
+        if not self.enabled:
+            raise NavigationUnavailable("HERE Navigate feature flag is disabled")
         if not location_permission_granted:
             raise LocationPermissionDenied("Location permission required for device navigation")
         raise NavigationUnavailable("HERE Navigate SDK not integrated")

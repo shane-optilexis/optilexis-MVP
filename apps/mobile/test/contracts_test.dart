@@ -26,7 +26,7 @@ void main() {
 
   test('HERE route rejects missing OS permission', () async {
     await expectLater(
-      const HereNavigateAdapter().startRoute(journeyId: 'trip', osLocationPermissionGranted: false),
+      const HereNavigateAdapter(enabled: true).startRoute(journeyId: 'trip', osLocationPermissionGranted: false),
       throwsA(isA<NavigationUnavailable>()),
     );
   });

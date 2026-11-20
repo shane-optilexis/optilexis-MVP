@@ -41,10 +41,12 @@ def test_simulation_provider_cannot_masquerade_as_here():
         events = [x async for x in mock.subscribe(jid)]
         assert all(x.simulated and x.source is NavigationSource.SIMULATION for x in events)
         await mock.stop_route(jid)
-        with pytest.raises(LocationPermissionDenied):
-            await HereNavigateBoundary().start_route(jid, location_permission_granted=False)
-        with pytest.raises(NavigationUnavailable):
+        with pytest.raises(NavigationUnavailable, match="feature flag"):
             await HereNavigateBoundary().start_route(jid, location_permission_granted=True)
+        with pytest.raises(LocationPermissionDenied):
+            await HereNavigateBoundary(enabled=True).start_route(jid, location_permission_granted=False)
+        with pytest.raises(NavigationUnavailable):
+            await HereNavigateBoundary(enabled=True).start_route(jid, location_permission_granted=True)
         with pytest.raises(NavigationUnavailable):
             await MapsHandoffBoundary().start_route(jid, location_permission_granted=True)
     asyncio.run(check())

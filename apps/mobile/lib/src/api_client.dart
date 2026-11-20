@@ -55,7 +55,7 @@ class OptilexisApi {
 
   void setDebugToken(String token) {
     if (!canEnterDebugToken) throw const OptilexisApiException('Development sign-in unavailable');
-    _tokenProvider.setToken(token);
+    (_tokenProvider as DebugAccessTokenProvider).setToken(token);
   }
   void clearDebugToken() {
     if (_tokenProvider is DebugAccessTokenProvider) {
