@@ -13,3 +13,30 @@ jobs:
           cache: true
       - name: Generate native project scaffold and check Dart code
         run: ./scripts/bootstrap_flutter.sh
+
+  android-native-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native project scaffold
+        run: ./scripts/bootstrap_flutter.sh
+      - name: Build Android debug APK
+        working-directory: apps/mobile
+        run: flutter build apk --debug --no-pub
+  ios-simulator-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native project scaffold
+        run: ./scripts/bootstrap_flutter.sh
+      - name: Build unsigned iOS simulator
+        working-directory: apps/mobile
+        run: flutter build ios --simulator --debug --no-codesign

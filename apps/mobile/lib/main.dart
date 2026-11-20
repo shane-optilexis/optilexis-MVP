@@ -1,10 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'src/api_client.dart';
 import 'src/design.dart';
 import 'src/models.dart';
+import 'src/phone_location.dart';
 
 void main() => runApp(const OptilexisApp());
 
@@ -56,6 +56,7 @@ class JourneyHome extends StatefulWidget {
 class _JourneyHomeState extends State<JourneyHome> {
   final _destination = TextEditingController(text: 'Shinjuku Station, Tokyo');
   final _debugToken = TextEditingController();
+  final _freeformText = TextEditingController();
   late final OptilexisApi _api;
   late final bool _ownsApi;
 
@@ -73,6 +74,9 @@ class _JourneyHomeState extends State<JourneyHome> {
   PhraseDto? _lastPhrase;
   List<JourneyDto> _history = [];
   bool _authenticated = false;
+  String? _liveTranslatedText;
+  String? _lastPosition;
+  final _phoneLocation = PhoneLocation();
 
   @override
   void initState() {
@@ -81,6 +85,11 @@ class _JourneyHomeState extends State<JourneyHome> {
     _api = widget.api ?? OptilexisApi();
     final configured = _api.debugTokenConfigured;
     _pingBackend();
+    if (_api.oidcConfigured) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _restoreOidc();
+      });
+    }
     if (configured) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _loadHistory();
@@ -92,6 +101,7 @@ class _JourneyHomeState extends State<JourneyHome> {
   void dispose() {
     _destination.dispose();
     _debugToken.dispose();
+    _freeformText.dispose();
     if (_ownsApi) _api.dispose();
     super.dispose();
   }
@@ -148,6 +158,70 @@ class _JourneyHomeState extends State<JourneyHome> {
         });
       });
 
+  Future<void> _restoreOidc() => _run(() async {
+        if (await _api.restoreOidc()) {
+          final history = await _api.listJourneys();
+          if (!mounted) return;
+          setState(() {
+            _authenticated = true;
+            _history = history;
+          });
+        }
+      });
+
+  Future<void> _signInOidc() => _run(() async {
+        await _api.signInOidc();
+        final history = await _api.listJourneys();
+        if (!mounted) return;
+        setState(() {
+          _authenticated = true;
+          _history = history;
+        });
+      });
+
+  Future<void> _signOut() => _run(() async {
+        await _api.signOut();
+        if (!mounted) return;
+        setState(() {
+          _authenticated = false;
+          _journey = null;
+          _history = [];
+          _lastOutcome = null;
+          _lastPhrase = null;
+          _lastPosition = null;
+          _liveTranslatedText = null;
+        });
+      });
+
+  Future<void> _fetchPosition() => _run(() async {
+        if (_journey == null) return;
+        final pos = await _phoneLocation.current(
+          userConsent: _journey!.consent.location && _consentLocation,
+          userActivated: true,
+        );
+        if (mounted) {
+          setState(() => _lastPosition =
+              '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}');
+        }
+      });
+
+  Future<void> _translateLiveText() => _run(() async {
+        if (_journey == null || _journey!.mode == 'drive') {
+          throw const OptilexisApiException('Text translation is disabled in driving mode');
+        }
+        final input = _freeformText.text.trim();
+        if (input.isEmpty || input.length > 400) {
+          throw const OptilexisApiException('Enter 1–400 characters for translation');
+        }
+        final result = await _api.translateText(
+          journeyId: _journey!.id,
+          text: input,
+          sourceLanguage: 'en',
+          targetLanguage: _language,
+        );
+        if (mounted) setState(() => _liveTranslatedText = result['translated_text'] as String?);
+      });
+
   Future<void> _signIn() async {
     _api.setDebugToken(_debugToken.text);
     await _loadHistory();
@@ -172,6 +246,8 @@ class _JourneyHomeState extends State<JourneyHome> {
           _lastOutcome = null;
           _lastPhrase = null;
           _parked = false;
+          _lastPosition = null;
+          _liveTranslatedText = null;
         });
       });
 
@@ -230,18 +306,9 @@ class _JourneyHomeState extends State<JourneyHome> {
             ],
           ),
           actions: [
-            if (_authenticated && kDebugMode) IconButton(
+            if (_authenticated) IconButton(
               tooltip: 'Sign out of development account',
-              onPressed: _busy ? null : () {
-                _api.clearDebugToken();
-                setState(() {
-                  _authenticated = false;
-                  _journey = null;
-                  _history = [];
-                  _lastOutcome = null;
-                  _lastPhrase = null;
-                });
-              },
+              onPressed: _busy ? null : _signOut,
               icon: const Icon(Icons.logout_outlined),
             ),
             Padding(
@@ -261,8 +328,10 @@ class _JourneyHomeState extends State<JourneyHome> {
                 padding: const EdgeInsets.all(18),
                 children: [
                   _prototypeBanner(),
-                  if (kDebugMode && !_authenticated) _developmentSignInCard(),
-                  if (!kDebugMode && !_authenticated) _notice('OIDC sign-in integration is pending provider registration. Release mode has no development token fallback.', Colors.orangeAccent),
+                  if (_api.oidcConfigured && !_authenticated) _oidcSignInCard(),
+                  if (_api.canEnterDebugToken && !_authenticated) _developmentSignInCard(),
+                  if (!_api.oidcConfigured && !_api.canEnterDebugToken && !_authenticated)
+                    _notice('Configure a registered OIDC public client to sign in. No anonymous or release-mode development token fallback.', Colors.orangeAccent),
                   if (_error != null) _notice(_error!, Colors.orangeAccent),
                   if (_authenticated) ...[
                     if (_journey == null) _setupCard() else _activeJourneyCard(),
@@ -273,13 +342,15 @@ class _JourneyHomeState extends State<JourneyHome> {
                     _simulationCard(),
                     if (_lastOutcome != null) _outcomeCard(),
                     _phraseCard(),
+                    _liveTranslationCard(),
+                    _phoneLocationCard(),
                     if (_lastPhrase != null) _phraseResultCard(),
                     _endJourneyCard(),
                   ],
                   _devicesCard(),
                   const SizedBox(height: 16),
                   const Text(
-                    'Pilot foundation • No live GPS, ASR, TTS, HERE navigation, Meta or Vantrue connection.',
+                    'Pilot foundation • GPS is one-shot only. No live turn guidance, speech ASR/TTS, HERE, Meta or Vantrue connection.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: optilexisMuted, fontSize: 12),
                   ),
@@ -287,6 +358,22 @@ class _JourneyHomeState extends State<JourneyHome> {
               ),
             ),
           ),
+        ),
+      );
+
+  Widget _oidcSignInCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _section('Secure sign in'),
+            const Text('Continue with your organization’s registered identity provider using the system browser. No password is collected by Optilexis.'),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _busy ? null : _signInOidc,
+              icon: const Icon(Icons.verified_user_outlined),
+              label: const Text('Sign in securely'),
+            ),
+          ]),
         ),
       );
 
@@ -524,6 +611,52 @@ class _JourneyHomeState extends State<JourneyHome> {
             const SizedBox(height: 8),
             const Text('Curated demonstration, not real-time translation or audio.',
                 style: TextStyle(color: optilexisMuted, fontSize: 12)),
+          ]),
+        ),
+      );
+
+  Widget _liveTranslationCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _section('Text translation • provider gated'),
+            if (_mode == 'drive')
+              const Text('Disabled while driving. No user-declared parked status can override this safety gate.')
+            else ...[
+              const Text('Type English text and request a translation. Requires server-side Azure Translator configuration. No audio or automatic microphone capture.'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _freeformText,
+                maxLength: 400,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Text to translate', hintText: 'Where is the station?'),
+              ),
+              ElevatedButton(
+                onPressed: _busy ? null : _translateLiveText,
+                child: Text('Translate to ${_languages[_language]}'),
+              ),
+              if (_liveTranslatedText != null) ...[
+                const SizedBox(height: 10),
+                SelectableText(_liveTranslatedText!, style: const TextStyle(color: optilexisTeal, fontSize: 18)),
+              ],
+            ],
+          ]),
+        ),
+      );
+
+  Widget _phoneLocationCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _section('Phone position • on demand'),
+            const Text('One foreground GPS reading with permission, never sent to the API. Not a HERE route or a turn-by-turn instruction.'),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _busy || !_consentLocation ? null : _fetchPosition,
+              icon: const Icon(Icons.my_location_outlined),
+              label: const Text('Check my phone position'),
+            ),
+            if (_lastPosition != null) Text('Approximate coordinates: $_lastPosition'),
           ]),
         ),
       );

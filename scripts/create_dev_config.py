@@ -12,7 +12,7 @@ if output.exists():
 folder = root / 'services' / 'journey-api' / 'var'
 folder.mkdir(parents=True, exist_ok=True)
 token = secrets.token_urlsafe(32)
-identity = {token: {'sub': 'local-pilot-user', 'scope': 'journeys:read journeys:write translation:demo'}}
+identity = {token: {'sub': 'local-pilot-user', 'scope': 'journeys:read journeys:write translation:demo translation:live'}}
 values = {
     'ENV': 'development',
     'DATABASE_URL': f'sqlite+pysqlite:///{folder / "optilexis.sqlite"}',

@@ -75,3 +75,11 @@ AGENTS.md                   Coding-agent rules and scope protection
 ```
 
 See the architecture/requirements in `docs/PRODUCT_REQUIREMENTS.md` and `docs/ARCHITECTURE.md` for original scope; `docs/Optilexis_Mobile_App_Technical_Architecture_and_Development_Plan.docx` is an associated planning document, not yet included as a binary in GitHub.
+
+## Milestone 03 — OIDC, GPS and native builds
+
+The milestone branch introduces configurable Authorization Code + PKCE login via AppAuth, secure token persistence and refresh, and a single foreground, consent-gated GPS reading. No OIDC tenant or live HERE route is connected yet.
+
+The backend offers a credential-gated, server-side Azure Translator v3 TEXT endpoint for active owned WALKING journeys. A real resource is required before it works; ASR/TTS/audio remains unimplemented. All provider credentials stay off the phone.
+
+The Flutter CI now runs source analysis, widget tests, an Android debug APK build and an unsigned iOS simulator build. Builds are not physical device tests or store-distribution approvals. See docs/MILESTONE_03_IDENTITY_NAV_TRANSLATION.md for provider registration, security gates and dependencies.
