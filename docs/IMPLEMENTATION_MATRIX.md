@@ -23,3 +23,12 @@
 | OpenAI/LLM assistant | Architecture only | No production reasoning service connected |
 
 **Risk gates:** User route state is not inferred from external Google/Apple Maps; video is never silently uploaded; tokens are not hard-coded; development mode requires explicit configuration and must remain local-only.
+
+### Milestone 03 delta — not live-provider acceptance
+
+| Capability | New source | Verified scope / remaining dependency |
+| --- | --- | --- |
+| Mobile OIDC public client | oidc_auth.dart + api_client.dart | PKCE, secure token storage and refresh code; real IdP native client registration and end-to-end login pending |
+| Phone GPS | phone_location.dart | On-demand foreground location; user preference + OS permission, never backend tracking; no route maneuvers |
+| Azure text translation | live_text.py + /v1/translation/text | Authenticated, owner-scoped WALK-only, text-only, upstream HTTP-mock tested; no Azure subscription connected |
+| Native build gates | configure_native.py + Flutter CI | Android debug APK and unsigned iOS simulator compilation; physical devices/signing remain pending |
