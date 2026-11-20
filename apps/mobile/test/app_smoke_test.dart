@@ -29,6 +29,7 @@ void main() {
     expect(find.text('OPTILEXIS'), findsOneWidget);
     expect(find.text('Plan a journey'), findsOneWidget);
     expect(find.textContaining('DEVELOPMENT SIMULATOR'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('My journeys (persisted)'), 250);
     expect(find.text('My journeys (persisted)'), findsOneWidget);
   });
 
