@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 const optilexisNavy = Color(0xFF071629);
 const optilexisDeep = Color(0xFF102B46);

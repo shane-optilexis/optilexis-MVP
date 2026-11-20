@@ -1,33 +1,25 @@
-# Optilexis requirement-to-code traceability
+# Optilexis requirements-to-code traceability
 
-**Status as delivered:** 19 Nov 2026, Sprint 01 scaffold. `Verified` refers to automated backend tests in the authoring runtime; it does not imply a compiled mobile release.
+**Sprint 02 status, Nov 2026.** "Verified" means local automated Python tests passed. It does **not** mean the Flutter app compiled, deployed or connected to a hardware SDK.
 
-| Requirement | Implementation location | Status / gap |
+| Requirement | Implementation | Verification and remaining gap |
 |---|---|---|
-| Cross-platform iOS/Android app | `apps/mobile/lib/main.dart` | Source written; Flutter native runners/build validation needed |
-| Premium navy/teal Optilexis theme | `apps/mobile/lib/src/design.dart` | Written; device visual QA pending |
-| Destination and journey mode | `POST /v1/journeys`; setup screen | Backend verified; mobile not compiled |
-| Language preferences (seven locales) | API models, UI dropdown | Backend verified; limited curated phrasebook only |
-| Session lifecycle | API create/read/list/close | Verified, in-memory only, no auth |
-| Context-based action recommendations | `predictor.py` | Verified with simulated events only |
-| Deterministic driving safety gating | `predictor.py` | Verified moving/parked behavior |
-| Consent choices | `Consent` model and UI switches | User preferences recorded locally in process; no OS permissions requested |
-| Google Maps directions handoff | `main.dart::_handoff` | Implemented in source, device test pending; no live route events |
-| Optilexis-owned navigation | `NavigationMode.OWN_ROUTE` contract | Not implemented: licensed HERE SDK required |
-| Live ASR/translation/TTS | API `/v1/translation/freeform` returns 501 | Not implemented; demo phrase endpoint only |
-| Meta glasses interactions | Device status list | Not implemented; device toolkit & hardware required |
-| Vantrue E1 Pro S streaming | Capability explicitly unverified | Not implemented; seek official interface/terms |
-| Local OCR and visual intelligence | Architecture spec only | Not implemented; future approved Drive Edge |
-| CarPlay / Android Auto | Architecture spec only | Not implemented; platform approvals required |
-| Secure accounts and persistence | Sprint 02 brief | Not implemented; no public deployment |
-| Monitoring and analytics | Sprint 02/03 | Not implemented |
-| Automated backend tests | `services/journey-api/tests` | 9 tests passing |
-| Flutter build and widget tests | `apps/mobile/test` | Code provided; SDK unavailable in authoring runtime |
+| Authenticated API | `optilexis_api/auth.py`, `settings.py` | Verified dev bearer and mocked RS256 OIDC validation; live identity provider not provisioned |
+| Scoped multiuser journeys | `main.py`, `repository.py` | Verified 401/403/404 and cross-user isolation for read/write/delete/close/event/consent |
+| Durable journey storage | SQLAlchemy tables + Alembic `0001` | Verified on migrated SQLite across app restarts; PostgreSQL CI integration test added, result pending |
+| Users and sessions | `users`, `journey_sessions` | Persisted; JWT is stateless; production session revocation remains IdP responsibility |
+| Consents / audit metadata | `consents`, `audit_events` | Persisted; explicit update, no sensor activation; privacy retention review pending |
+| Deletion / retention | `DELETE /v1/me/data`, `DELETE /v1/journeys/{id}`, `purge_closed_journeys` | Verified explicit deletion; background retention schedule pending |
+| Context recommendations | `predictor.py`, `recommendation_events` | Verified simulated event rules and metadata; not real navigation |
+| Driving safety | `predictor.py` | Verified suppression for moving vehicles; safety review pending |
+| Navigation interface | `navigation.py`, `navigation_contract.dart` | Simulation labeled, permission denial & disabled-by-default HERE boundary; licensed HERE SDK unavailable |
+| Maps handoff | `main.dart::_handoff` | Source provided, no app-to-app route telemetry; mobile device test pending |
+| Translation provider | `translation.py`, `speech_contract.dart` | Provider contract, consent/cost/timeout gate + demo phrasebook; no live ASR/MT/TTS |
+| Flutter typed API (`material_ui` 1.x) | `api_client.dart`, `models.dart` | Code implemented, history and debug sign-in wired; `flutter analyze/test` CI pending |
+| Seven-language phrasebook | `phrases.py` | Previously verified; limited curated demonstration translations |
+| Vantrue E1 Pro S | Architecture only | Official camera video interface unverified; no actual integration |
+| Meta glasses | Architecture only | Native device access/bridge not built |
+| CarPlay and Android Auto | Architecture only | Qualifying native implementation and review pending |
+| OpenAI/LLM assistant | Architecture only | No production reasoning service connected |
 
-## Risk gates
-
-- Handoff mode cannot and must not claim live navigation telemetry.
-- Camera streaming depends on manufacturer-provided, permitted interfaces; no guessed RTSP endpoints.
-- Driving UI must suppress non-navigation prompts while moving.
-- Prototype backend must bind to `127.0.0.1` until authentication and transport security are in place.
-- User location, microphone and video inputs are **not accessed** in this release.
+**Risk gates:** User route state is not inferred from external Google/Apple Maps; video is never silently uploaded; tokens are not hard-coded; development mode requires explicit configuration and must remain local-only.

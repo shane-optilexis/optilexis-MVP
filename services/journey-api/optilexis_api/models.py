@@ -28,10 +28,19 @@ class JourneyStage(str, Enum):
 
 
 class Consent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     # User intent only. No sensors are activated by these fields in the starter.
     location: bool = False
     microphone: bool = False
     camera: bool = False
+
+
+class ConsentPatch(BaseModel):
+    """PATCH only named preferences. Omitted preferences stay unchanged."""
+    model_config = ConfigDict(extra="forbid")
+    location: bool | None = None
+    microphone: bool | None = None
+    camera: bool | None = None
 
 
 class StartJourney(BaseModel):
